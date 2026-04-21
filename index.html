@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowSearch - 智能搜索</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%234f46e5' stroke-width='2'><circle cx='11' cy='11' r='8'/><path d='m21 21-4.35-4.35'/></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 10vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 50%, #16213e 100%);
+            overflow: hidden;
+            position: relative;
+        }
+
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image:
+                linear-gradient(rgba(80, 120, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(80, 120, 255, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow {
+            position: fixed;
+            width: 600px;
+            height: 600px;
+            border-radius: 50%;
+            filter: blur(120px);
+            opacity: 0.15;
+            pointer-events: none;
+            z-index: 0;
+            animation: float 8s ease-in-out infinite;
+        }
+
+        .bg-glow-1 {
+            top: -200px;
+            left: -200px;
+            background: #4f46e5;
+        }
+
+        .bg-glow-2 {
+            bottom: -200px;
+            right: -200px;
+            background: #06b6d4;
+            animation-delay: -4s;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0); }
+            50% { transform: translate(30px, 30px); }
+        }
+
+        .container {
+            position: relative;
+            z-index: 1;
+            text-align: center;
+            padding: 60px 20px 20px;
+        }
+
+        .logo {
+            font-size: 48px;
+            font-weight: 300;
+            color: #fff;
+            margin-bottom: 30px;
+            letter-spacing: 8px;
+            text-transform: uppercase;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease forwards;
+        }
+
+        .logo span {
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 600;
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .search-box {
+            position: relative;
+            width: 1000px;
+            max-width: 100%;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.2s forwards;
+        }
+
+        .search-input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+        }
+
+        .search-input-wrapper:focus-within {
+            background: rgba(255, 255, 255, 0.12);
+            border-color: rgba(79, 70, 229, 0.6);
+            box-shadow: 0 0 30px rgba(79, 70, 229, 0.2);
+        }
+
+        .dropdown {
+            position: relative;
+        }
+
+        .dropdown-btn {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            padding: 6px 8px;
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .dropdown-btn:hover {
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .dropdown-btn img {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+
+        .dropdown-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 0;
+            min-width: 50px;
+            background: rgba(30, 30, 50, 0.95);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 8px;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.3s ease;
+            backdrop-filter: blur(20px);
+            z-index: 100;
+        }
+
+        .dropdown.open .dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .dropdown-item {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .dropdown-item.active {
+            background: linear-gradient(135deg, rgba(79, 70, 229, 0.4), rgba(6, 182, 212, 0.4));
+        }
+
+        .dropdown-item img {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+        }
+
+        #searchInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: #fff;
+            font-size: 18px;
+            padding: 12px 0 12px 16px;
+        }
+
+        #searchInput::placeholder {
+            color: rgba(255, 255, 255, 0.35);
+        }
+
+        .search-btn {
+            padding: 12px 32px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #4f46e5, #06b6d4);
+            color: #fff;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .search-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(79, 70, 229, 0.4);
+        }
+
+        .search-btn:active {
+            transform: translateY(0);
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 30px;
+            color: rgba(255, 255, 255, 0.25);
+            font-size: 12px;
+            letter-spacing: 2px;
+            opacity: 0;
+            animation: fadeInUp 0.8s ease 0.6s forwards;
+        }
+
+        @media (max-width: 640px) {
+            .logo {
+                font-size: 32px;
+                letter-spacing: 4px;
+                margin-bottom: 40px;
+            }
+
+            .search-box {
+                padding: 0 10px;
+            }
+
+            .dropdown-btn img,
+            .dropdown-item img {
+                width: 20px;
+                height: 20px;
+            }
+
+            #searchInput {
+                font-size: 16px;
+            }
+
+            .search-btn {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="container">
+        <h1 class="logo">Flow<span>Search</span></h1>
+
+        <div class="search-box">
+            <div class="search-input-wrapper">
+                <div class="dropdown" id="engineDropdown">
+                    <button class="dropdown-btn" id="dropdownBtn">
+                        <img id="currentEngineIcon" src="https://static.zhihu.com/heifetz/favicon.ico" alt="">
+                    </button>
+                    <div class="dropdown-menu">
+                        <div class="dropdown-item active" data-engine="zhihu">
+                            <img src="https://static.zhihu.com/heifetz/favicon.ico" alt="知乎">
+                        </div>
+                        <div class="dropdown-item" data-engine="xiaohongshu">
+                            <img src="https://fe-video-qc.xhscdn.com/fe-platform/ed8fe781ce9e16c1bfac2cd962f0721edabe2e49.ico" alt="小红书">
+                        </div>
+                        <div class="dropdown-item" data-engine="bilibili">
+                            <img src="https://i0.hdslb.com/bfs/static/jinkela/long/images/favicon.ico" alt="B站">
+                        </div>
+			<div class="dropdown-item" data-engine="douyin">
+                            <img src="https://p-pc-weboff.byteimg.com/tos-cn-i-9r5gewecjs/favicon.png" alt="抖音">
+                        </div>
+                    </div>
+                </div>
+
+                <input type="text" id="searchInput" placeholder="输入关键词搜索..." autocomplete="off">
+                <button class="search-btn" id="searchBtn">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">FLOWSEARCH</div>
+
+    <script>
+        const searchUrls = {
+            zhihu: 'https://www.zhihu.com/search?q={keyword}&type=content',
+            xiaohongshu: 'https://www.xiaohongshu.com/search_result?keyword={keyword}',
+            bilibili: 'https://search.bilibili.com/all?keyword={keyword}',
+            douyin: 'https://www.douyin.com/jingxuan/search/{keyword}'
+        };
+
+        let currentEngine = 'zhihu';
+        const dropdown = document.getElementById('engineDropdown');
+        const dropdownBtn = document.getElementById('dropdownBtn');
+        const dropdownItems = document.querySelectorAll('.dropdown-item');
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const currentEngineIcon = document.getElementById('currentEngineIcon');
+
+        dropdownBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            dropdown.classList.toggle('open');
+        });
+
+        document.addEventListener('click', () => {
+            dropdown.classList.remove('open');
+        });
+
+        dropdownItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const engine = item.dataset.engine;
+
+                dropdownItems.forEach(i => i.classList.remove('active'));
+                item.classList.add('active');
+
+                currentEngine = engine;
+                currentEngineIcon.src = item.querySelector('img').src;
+
+                dropdown.classList.remove('open');
+            });
+        });
+
+        function performSearch() {
+            const keyword = searchInput.value.trim();
+            if (!keyword) {
+                searchInput.focus();
+                return;
+            }
+            const url = searchUrls[currentEngine].replace('{keyword}', encodeURIComponent(keyword));
+            window.open(url, '_blank');
+        }
+
+        searchBtn.addEventListener('click', performSearch);
+
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
+
+        searchInput.focus();
+    </script>
+</body>
+</html>
